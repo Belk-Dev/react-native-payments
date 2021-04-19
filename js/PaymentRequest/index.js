@@ -257,8 +257,7 @@ export default class PaymentRequest {
         GATEWAY_ERROR_EVENT,
         this._handleGatewayError.bind(this)
       );
-
-      console.log("adding listener ")
+ 
       // https://www.w3.org/TR/payment-request/#onpaymentmethodchange-attribute
       this._paymentMethodChangeSubscription = DeviceEventEmitter.addListener(
         INTERNAL_PAYMENT_METHOD_CHANGE_EVENT,
