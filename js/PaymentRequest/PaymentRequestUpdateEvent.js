@@ -2,8 +2,10 @@ import { Platform } from 'react-native';
 
 import {
   MODULE_SCOPING,
+  PAYMENT_METHOD_CHANGE_EVENT,
   SHIPPING_ADDRESS_CHANGE_EVENT,
   SHIPPING_OPTION_CHANGE_EVENT,
+  INTERNAL_PAYMENT_METHOD_CHANGE_EVENT,
   INTERNAL_SHIPPING_ADDRESS_CHANGE_EVENT,
   INTERNAL_SHIPPING_OPTION_CHANGE_EVENT,
   USER_DISMISS_EVENT,
@@ -35,11 +37,12 @@ export default class PaymentRequestUpdateEvent {
 
   constructor(name, target) {
     if (
+      name !== PAYMENT_METHOD_CHANGE_EVENT &&
       name !== SHIPPING_ADDRESS_CHANGE_EVENT &&
       name !== SHIPPING_OPTION_CHANGE_EVENT
     ) {
       throw new Error(
-        `Only "${SHIPPING_ADDRESS_CHANGE_EVENT}" and "${SHIPPING_OPTION_CHANGE_EVENT}" event listeners are supported.`
+        `Only "${PAYMENT_METHOD_CHANGE_EVENT}", "${SHIPPING_ADDRESS_CHANGE_EVENT}" and "${SHIPPING_OPTION_CHANGE_EVENT}" event listeners are supported.`
       );
     }
 
@@ -126,10 +129,10 @@ export default class PaymentRequestUpdateEvent {
           }
 
           if (
-            target._details.shippingOptions
-            && target._details.shippingOptions.length > 0
-            && value.shippingOptions
-            && ((value.shippingOptions.find(op => op.selected) || {}).id || null) !== target._shippingOption
+            target._details.shippingOptions &&
+            target._details.shippingOptions.length > 0 &&
+            value.shippingOptions &&
+            value.shippingOptions.find(op => op.selected)?.id !== target._shippingOption
           ) {
             target._handleShippingOptionChange({
               selectedShippingOptionId: target._details.shippingOptions[0].id

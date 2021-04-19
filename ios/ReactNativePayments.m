@@ -106,7 +106,7 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
                   callback: (RCTResponseSenderBlock)callback)
 
 {
-    if (!self.shippingContactCompletion && !self.shippingMethodCompletion) {
+    if (!self.paymentMethodCompletion && !self.shippingContactCompletion && !self.shippingMethodCompletion) {
         // TODO:
         // - Call callback with error saying shippingContactCompletion was never called;
         
@@ -117,6 +117,12 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
     
     NSArray<PKPaymentSummaryItem *> * paymentSummaryItems = [self getPaymentSummaryItemsFromDetails:details];
     
+    if (self.paymentMethodCompletion) {
+        self.paymentMethodCompletion(paymentSummaryItems);
+        
+        // Invalidate `self.paymentMethodCompletion`
+        self.paymentMethodCompletion = nil;
+    }
     
     if (self.shippingMethodCompletion) {
         self.shippingMethodCompletion(
@@ -174,6 +180,21 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
     } else {
         [self handleUserAccept:payment paymentToken:nil];
     }
+}
+
+// Payment Method
+- (void)paymentAuthorizationViewController:(PKPaymentAuthorizationViewController *)controller
+                    didSelectPaymentMethod:(PKPaymentMethod *)paymentMethod
+                                completion:(void (^)(NSArray<PKPaymentSummaryItem *> *summaryItems))completion
+{
+    self.paymentMethodCompletion = completion;
+    
+    NSDictionary *paymentMethodString = [self paymentMethodToString:paymentMethod];
+    
+    [self.bridge.eventDispatcher sendDeviceEventWithName:@"NativePayments:onpaymentmethodchange" body:@{
+                                                                                                         @"paymentMethod": paymentMethodString
+                                                                                                         }];
+    
 }
 
 

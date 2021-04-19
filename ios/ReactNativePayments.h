@@ -19,6 +19,7 @@
 @property BOOL *hasGatewayParameters;
 @property (nonatomic, strong) PKPaymentAuthorizationViewController *viewController;
 @property (nonatomic, copy) void (^completion)(PKPaymentAuthorizationStatus);
+@property (nonatomic, copy) void (^paymentMethodCompletion)(NSArray<PKPaymentSummaryItem *> * _Nonnull);
 @property (nonatomic, copy) void (^shippingContactCompletion)(PKPaymentAuthorizationStatus, NSArray<PKShippingMethod *> * _Nonnull, NSArray<PKPaymentSummaryItem *> * _Nonnull);
 @property (nonatomic, copy) void (^shippingMethodCompletion)(PKPaymentAuthorizationStatus, NSArray<PKPaymentSummaryItem *> * _Nonnull);
 

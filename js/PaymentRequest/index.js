@@ -46,8 +46,10 @@ import { ConstructorError, GatewayError } from './errors';
 // Constants
 import {
   MODULE_SCOPING,
+  PAYMENT_METHOD_CHANGE_EVENT,
   SHIPPING_ADDRESS_CHANGE_EVENT,
   SHIPPING_OPTION_CHANGE_EVENT,
+  INTERNAL_PAYMENT_METHOD_CHANGE_EVENT,
   INTERNAL_SHIPPING_ADDRESS_CHANGE_EVENT,
   INTERNAL_SHIPPING_OPTION_CHANGE_EVENT,
   USER_DISMISS_EVENT,
@@ -97,6 +99,7 @@ const IS_IOS = Platform.OS === 'ios'
 
 export default class PaymentRequest {
   _id: string;
+  _paymentMethod: any;
   _shippingAddress: null | PaymentAddress;
   _shippingOption: null | string;
   _shippingType: null | PaymentShippingType;
@@ -111,13 +114,16 @@ export default class PaymentRequest {
   _acceptPromise: Promise<any>;
   _acceptPromiseResolver: (value: any) => void;
   _acceptPromiseRejecter: (reason: any) => void;
+  _paymentMethodChangeSubscription: any; // TODO: - add proper type annotation
   _shippingAddressChangeSubscription: any; // TODO: - add proper type annotation
   _shippingOptionChangeSubscription: any; // TODO: - add proper type annotation
   _userDismissSubscription: any; // TODO: - add proper type annotation
   _userAcceptSubscription: any; // TODO: - add proper type annotation
   _gatewayErrorSubscription: any; // TODO: - add proper type annotation
+  _paymentMethodChangesCount: number;
   _shippingAddressChangesCount: number;
 
+  _paymentMethodChangeFn: PaymentRequestUpdateEvent => void; // function provided by user
   _shippingAddressChangeFn: PaymentRequestUpdateEvent => void; // function provided by user
   _shippingOptionChangeFn: PaymentRequestUpdateEvent => void; // function provided by user
 
@@ -192,7 +198,11 @@ export default class PaymentRequest {
 
     // 19. Set the value of the shippingAddress attribute on request to null.
     this._shippingAddress = null;
-    // 20. If options.requestShipping is set to true, then set the value of the shippingType attribute on request to options.shippingType. Otherwise, set it to null.
+
+    // 20. Set the value of the shippingAddress attribute on request to null.
+    this._paymentMethod = null;
+
+    // 21. If options.requestShipping is set to true, then set the value of the shippingType attribute on request to options.shippingType. Otherwise, set it to null.
     this._shippingType = IS_IOS && options.requestShipping === true
       ? options.shippingType
       : null;
@@ -203,8 +213,9 @@ export default class PaymentRequest {
     // Setup event listeners
     this._setupEventListeners();
 
-    // Set the amount of times `_handleShippingAddressChange` has been called.
+    // Set the amount of times `_handleShippingAddressChange` `_handlePaymentMethodChange` and have been called.
     // This is used on iOS to noop the first call.
+    this._paymentMethodChangesCount = 0;
     this._shippingAddressChangesCount = 0;
 
     const platformMethodData = getPlatformMethodData(methodData, Platform.OS);
@@ -247,6 +258,13 @@ export default class PaymentRequest {
         this._handleGatewayError.bind(this)
       );
 
+      console.log("adding listener ")
+      // https://www.w3.org/TR/payment-request/#onpaymentmethodchange-attribute
+      this._paymentMethodChangeSubscription = DeviceEventEmitter.addListener(
+        INTERNAL_PAYMENT_METHOD_CHANGE_EVENT,
+        this._handlePaymentMethodChange.bind(this)
+      );
+
       // https://www.w3.org/TR/payment-request/#onshippingoptionchange-attribute
       this._shippingOptionChangeSubscription = DeviceEventEmitter.addListener(
         INTERNAL_SHIPPING_OPTION_CHANGE_EVENT,
@@ -259,6 +277,27 @@ export default class PaymentRequest {
         this._handleShippingAddressChange.bind(this)
       );
     }
+  }
+
+  _handlePaymentMethodChange(paymentMethod: any) {
+    this._paymentMethod = paymentMethod;
+
+    const event = new PaymentRequestUpdateEvent(
+      PAYMENT_METHOD_CHANGE_EVENT,
+      this
+    );
+    this._paymentMethodChangesCount++;
+
+    // On iOS, this event fires when the PKPaymentRequest is initialized.
+    // So on iOS, we track the amount of times `_paymentMethodChangesCount` gets called
+    // and noop the first call.
+    if (IS_IOS && this._paymentMethodChangesCount === 1) {
+      return event.updateWith(this._details);
+    }
+
+    // Eventually calls `PaymentRequestUpdateEvent._handleDetailsUpdate` when
+    // after a details are returned
+    this._paymentMethodChangeFn && this._paymentMethodChangeFn(event);
   }
 
   _handleShippingAddressChange(postalAddress: PaymentAddress) {
@@ -414,6 +453,9 @@ export default class PaymentRequest {
 
     if (IS_IOS) {
       DeviceEventEmitter.removeSubscription(
+        this._paymentMethodChangeSubscription
+      );
+      DeviceEventEmitter.removeSubscription(
         this._shippingAddressChangeSubscription
       );
       DeviceEventEmitter.removeSubscription(
@@ -422,12 +464,17 @@ export default class PaymentRequest {
     }
   }
 
+  // https://www.w3.org/TR/payment-request/#onpaymentmethodchange-attribute
   // https://www.w3.org/TR/payment-request/#onshippingaddresschange-attribute
   // https://www.w3.org/TR/payment-request/#onshippingoptionchange-attribute
   addEventListener(
-    eventName: 'shippingaddresschange' | 'shippingoptionchange',
+    eventName: 'paymentmethodchange' | 'shippingaddresschange' | 'shippingoptionchange',
     fn: e => Promise<any>
   ) {
+    if (eventName === PAYMENT_METHOD_CHANGE_EVENT) {
+      return (this._paymentMethodChangeFn = fn.bind(this));
+    }
+
     if (eventName === SHIPPING_ADDRESS_CHANGE_EVENT) {
       return (this._shippingAddressChangeFn = fn.bind(this));
     }
