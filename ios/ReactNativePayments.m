@@ -442,7 +442,13 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
     }
     NSString *type = [self paymentMethodTypeToString:paymentMethod.type];
     [result setObject:type forKey:@"type"];
-    if(paymentMethod.paymentPass) {
+    
+    CGFloat iOSVersion = [[[UIDevice currentDevice] systemVersion] floatValue];
+    
+    if(iOSVersion >= 13.4 && paymentMethod.secureElementPass) {
+        NSDictionary *paymentPass = [self secureElementPassToDictionary:paymentMethod.secureElementPass];
+        [result setObject:paymentPass forKey:@"paymentPass"];
+    } else if(paymentMethod.paymentPass) {
         NSDictionary *paymentPass = [self paymentPassToDictionary:paymentMethod.paymentPass];
         [result setObject:paymentPass forKey:@"paymentPass"];
     }
@@ -471,6 +477,17 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
     };
 }
 
+- (NSDictionary *_Nonnull)secureElementPassToDictionary:(PKSecureElementPass *_Nonnull)secureElementPass
+{
+    return @{
+        @"primaryAccountIdentifier" : secureElementPass.primaryAccountIdentifier,
+        @"primaryAccountNumberSuffix" : secureElementPass.primaryAccountNumberSuffix,
+        @"deviceAccountIdentifier" : secureElementPass.deviceAccountIdentifier,
+        @"deviceAccountNumberSuffix" : secureElementPass.deviceAccountNumberSuffix,
+        @"activationState" : [self secureElementPassActivationStateToString:secureElementPass.passActivationState]
+    };
+}
+
 - (NSString *_Nonnull)paymentPassActivationStateToString:(PKPaymentPassActivationState)paymentPassActivationState
 {
     NSArray *arr = @[@"PKPaymentPassActivationStateActivated",
@@ -479,6 +496,16 @@ RCT_EXPORT_METHOD(handleDetailsUpdate: (NSDictionary *)details
                      @"PKPaymentPassActivationStateSuspended",
                      @"PKPaymentPassActivationStateDeactivated"];
     return (NSString *)[arr objectAtIndex:paymentPassActivationState];
+}
+
+- (NSString *_Nonnull)secureElementPassActivationStateToString:(PKSecureElementPassActivationState)secureElementPassActivationState
+{
+    NSArray *arr = @[@"PKSecureElementPassActivationStateActivated",
+                     @"PKSecureElementPassActivationStateRequiresActivation",
+                     @"PKSecureElementPassActivationStateActivating",
+                     @"PKSecureElementPassActivationStateSuspended",
+                     @"PKSecureElementPassActivationStateDeactivated"];
+    return (NSString *)[arr objectAtIndex:secureElementPassActivationState];
 }
 
 - (void)handleUserAccept:(PKPayment *_Nonnull)payment
